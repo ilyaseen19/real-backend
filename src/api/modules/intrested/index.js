@@ -17,13 +17,11 @@ const requestsSchema = new mongoose.Schema(
     userID: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     agentID: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     property: {

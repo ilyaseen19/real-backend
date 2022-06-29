@@ -120,12 +120,76 @@ router.patch("/update/:ID", async (req, res) => {
 
 router.delete("/remove/:ID", async (req, res) => {
   try {
+    const agentID = req.body.agentID;
     const deleted = await Property.findByIdAndDelete({ _id: req.params.ID });
-    if (deleted)
+
+    if (deleted) {
+      const agent = await Agent.findOne({ _id: agentID });
+
+      const newpropert = await agent.properties.filter(
+        (property) => property.propertyID !== req.params.ID
+      );
+
+      await Agent.updateOne(
+        {
+          _id: agentID,
+        },
+        {
+          $set: {
+            properties: newpropert,
+          },
+        }
+      );
       return res.status(200).json({
         success: 1,
         message: "Data removed successfully",
       });
+    }
+
+    if (!deleted)
+      return res.status(400).json({
+        success: 0,
+        message: "Could not remove data",
+      });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      success: 0,
+      message: "Error code 500",
+    });
+  }
+});
+
+router.delete("/sell/:ID", async (req, res) => {
+  try {
+    const agentID = req.body.agentID;
+    const deleted = await Property.findByIdAndDelete({ _id: req.params.ID });
+
+    if (deleted) {
+      const agent = await Agent.findOne({ _id: agentID });
+
+      const newpropert = await agent.properties.filter(
+        (property) => property.propertyID !== req.params.ID
+      );
+
+      const deals = parseInt(agent.deals) + 1;
+
+      await Agent.updateOne(
+        {
+          _id: agentID,
+        },
+        {
+          $set: {
+            deals: JSON.stringify(deals),
+            properties: newpropert,
+          },
+        }
+      );
+      return res.status(200).json({
+        success: 1,
+        message: "Property sold!",
+      });
+    }
 
     if (!deleted)
       return res.status(400).json({
@@ -239,7 +303,8 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
 
     if (savedProp) {
       const agent = await Agent.findById({ _id: savedProp.agentID });
-      const newProps = [...agent.properties, savedProp._id];
+      var propt = { propertyID: savedProp._id };
+      const newProps = [...agent.properties, propt];
       const saveId = await Agent.updateOne(
         { _id: agentID },
         {

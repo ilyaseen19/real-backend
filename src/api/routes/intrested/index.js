@@ -76,13 +76,18 @@ router.delete("/remove/:ID", async (req, res) => {
 router.post("/create", async (req, res) => {
   try {
     const { userName, userContact, userID, agentID, property } = req.body;
+    const prop = {
+      propName: property.name,
+      propLocation: property.location,
+      propID: property._id,
+    };
 
     const request = new Requests({
       userName,
       userContact,
       userID,
       agentID,
-      property,
+      property: prop,
     });
 
     const savedRequest = await request.save();

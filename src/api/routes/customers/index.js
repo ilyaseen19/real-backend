@@ -1,5 +1,6 @@
 const express = require("express");
 const { _encrypt, _decrypt } = require("../../libs/encrypt");
+const { upload } = require("../../middlewares/imageUpload");
 const Customer = require("../../modules/customers");
 
 const router = express.Router();
@@ -51,10 +52,57 @@ router.get("/getOne/:email", async (req, res) => {
   }
 });
 
+router.patch(
+  "/updateWithImage/:ID",
+  upload.single("profileImg"),
+  async (req, res) => {
+    try {
+      const url = req.protocol + "://" + req.get("host");
+      const profileImg = url + "/public/" + req.file.filename;
+      const data = await JSON.parse(req.body.data);
+      const _id = req.params.ID;
+      const { firstName, lastName, email, phone } = data;
+
+      const updated = await Agent.updateOne(
+        {
+          _id,
+        },
+        {
+          $set: {
+            firstName,
+            lastName,
+            email,
+            phone,
+            image: profileImg,
+          },
+        }
+      );
+
+      if (updated.modifiedCount > 0)
+        return res.status(201).json({
+          success: 1,
+          message: "Data updated successfully",
+        });
+
+      if (updated.modifiedCount <= 0)
+        return res.status(400).json({
+          success: 0,
+          message: "Could not update user",
+        });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({
+        success: 0,
+        message: "Internal Error: (500)",
+      });
+    }
+  }
+);
+
 router.patch("/update/:ID", async (req, res) => {
   try {
     const _id = req.params.ID;
-    const { firstName, lastName, email, phone, role, image } = req.body;
+    const { firstName, lastName, email, phone } = req.body;
     const updated = Customer.updateOne(
       {
         _id,
@@ -65,8 +113,6 @@ router.patch("/update/:ID", async (req, res) => {
           lastName,
           email,
           phone,
-          role,
-          image,
         },
       }
     );
@@ -158,12 +204,6 @@ router.post("/create", async (req, res) => {
         message: "User with this email already exist",
       });
 
-    if (emailExist.phone === phone)
-      return res.status(400).json({
-        success: 0,
-        message: "User with this phone number already exist",
-      });
-
     const encryptedPass = await _encrypt(password);
     const user = new Customer({
       firstName,
@@ -172,12 +212,13 @@ router.post("/create", async (req, res) => {
       email,
       password: encryptedPass,
       role,
+      isBlocked: false,
     });
     const savedUser = await user.save();
     if (savedUser)
       return res.status(201).json({
         success: 1,
-        message: "User created successfully",
+        message: "Account created successfully please login to continue",
       });
 
     if (!savedUser)
