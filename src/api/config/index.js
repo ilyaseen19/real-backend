@@ -1,5 +1,8 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 module.exports = {
-    database: 'mongodb+srv://ilyaseen19:Rafail19@assets-reg-1.t8uk3.mongodb.net/Real-Estate?retryWrites=true&w=majority',
+    database: process.env.MONGO_URI,
     server: {
       port: process.env.PORT || 8900,
     },
