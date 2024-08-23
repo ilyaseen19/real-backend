@@ -200,7 +200,7 @@ router.post("/create", upload.single("profileImg"), async (req, res) => {
   try {
     const url = req.protocol + "://" + req.get("host");
     const profileImg = req.file === undefined ? "" : url + "/public/" + req.file.filename;
-    const data = await JSON.parse(req.body.data);
+    const data = req.file === undefined ? req.body : await JSON.parse(req.body.data);
     const { firstName, lastName, phone, email, password, role, address } = data;
     const emailExist = await Admin.findOne({ email });
 
