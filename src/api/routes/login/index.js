@@ -9,6 +9,7 @@ const router = express.Router();
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
+    email.toLowerCase();
     const adminExist = await Admin.find();
     const agentExist = await Agent.find();
     const customerExist = await Customers.find();
