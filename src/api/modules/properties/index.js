@@ -14,6 +14,27 @@ const propertySchema = new mongoose.Schema(
       unique: false,
       trim: true,
     },
+    // Added new location fields to match frontend filters
+    country: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    province: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    city: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    suburb: {
+      type: String,
+      required: false,
+      trim: true,
+    },
     propType: {
       type: String,
       required: true,

@@ -215,17 +215,17 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       image5: "",
     };
     const url = req.protocol + "://" + req.get("host");
-    images.image1 = url + "/public/" + req.files[0].filename;
-    images.image2 = url + "/public/" + req.files[1].filename;
-    images.image3 = url + "/public/" + req.files[2].filename;
-    images.image4 =
-      req.files[3] !== undefined
-        ? url + "/public/" + req.files[3].filename
-        : "";
-    images.image5 =
-      req.files[4] !== undefined
-        ? url + "/public/" + req.files[4].filename
-        : "";
+    
+    // Improved error handling for image files
+    if (req.files && req.files.length > 0) {
+      images.image1 = req.files[0] ? url + "/public/" + req.files[0].filename : "";
+      images.image2 = req.files[1] ? url + "/public/" + req.files[1].filename : "";
+      images.image3 = req.files[2] ? url + "/public/" + req.files[2].filename : "";
+      images.image4 = req.files[3] ? url + "/public/" + req.files[3].filename : "";
+      images.image5 = req.files[4] ? url + "/public/" + req.files[4].filename : "";
+    } else {
+      console.log("No image files uploaded");
+    }
 
     const data = await JSON.parse(req.body.data);
     const {
@@ -256,6 +256,11 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       nmRoad,
       nsMarket,
       pets,
+      // Extract new location fields if they exist
+      country,
+      province,
+      city,
+      suburb
     } = data;
 
     const others = {
@@ -293,6 +298,11 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       digitalAddress: address,
       yearBuilt: year,
       agentID,
+      // Add new location fields
+      country: country || "",
+      province: province || "",
+      city: city || "",
+      suburb: suburb || "",
       others,
       isApproved: false,
       amenities,
