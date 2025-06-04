@@ -27,6 +27,7 @@ const Login = require("./api/routes/login");
 const Property = require("./api/routes/propperty");
 const UpImage = require("./api/routes/uploadImages");
 const Settings = require("./api/routes/settings");
+const Tours = require("./api/routes/tours");
 
 // end points
 app.use("/api/admin", Admin);
@@ -37,6 +38,7 @@ app.use("/api/signin", Login);
 app.use("/api/properties", Property);
 app.use("/api/upload", UpImage);
 app.use("/api/settings", Settings);
+app.use("/api/tours", Tours);
 
 app.get("/", (req, res) => {
   res.send("Hello Welcome to real estate api! written by prince");
