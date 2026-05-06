@@ -8,14 +8,19 @@ const router = express.Router();
 
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = String(req.body.email || "")
+      .trim()
+      .toLowerCase();
+    const password = String(req.body.password || "");
     const adminExist = await Admin.find();
     const agentExist = await Agent.find();
     const customerExist = await Customers.find();
 
     const users = [...adminExist, ...agentExist, ...customerExist];
 
-    const userExist = await users.find((user) => user.email === email);
+    const userExist = await users.find(
+      (user) => String(user.email || "").trim().toLowerCase() === email
+    );
 
     if (!userExist)
       return res.status(400).json({
