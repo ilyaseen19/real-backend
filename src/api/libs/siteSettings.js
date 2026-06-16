@@ -2,7 +2,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 
 const defaultSettings = {
   general: {
-    siteName: "BrightEstate",
+    siteName: "LEDS PROPERTIES",
     defaultLanguage: "English",
     defaultCurrency: "USD",
     defaultCurrencySymbol: "$",
@@ -174,6 +174,11 @@ const normalizeSettings = (settings = {}) => {
     ...clone(defaultSettings.general),
     ...settings.general,
   };
+
+  const currentSiteName = String(general.siteName || "").trim().toLowerCase();
+  if (currentSiteName === "brightestate" || currentSiteName === "hodalorestate") {
+    general.siteName = "LEDS PROPERTIES";
+  }
 
   if (!general.defaultCurrencySymbol && general.defaultCurrency === "USD") {
     general.defaultCurrencySymbol = "$";
