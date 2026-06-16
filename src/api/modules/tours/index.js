@@ -29,7 +29,8 @@ const tourSchema = new mongoose.Schema(
     },
     note: {
       type: String,
-      required: true,
+      required: false,
+      default: "",
       trim: true,
     },
     propertyId: {

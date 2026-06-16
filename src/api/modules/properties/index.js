@@ -59,6 +59,38 @@ const propertySchema = new mongoose.Schema(
       required: false,
       trim: true,
     },
+    shortStay: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      minimumNights: {
+        type: Number,
+        default: 1,
+      },
+      checkInTime: {
+        type: String,
+        default: "14:00",
+        trim: true,
+      },
+      checkOutTime: {
+        type: String,
+        default: "11:00",
+        trim: true,
+      },
+      openDates: {
+        type: [String],
+        default: [],
+      },
+      blockedDates: {
+        type: [String],
+        default: [],
+      },
+      bookedDates: {
+        type: [String],
+        default: [],
+      },
+    },
     numberOfRooms: {
       type: Number,
       required: true,

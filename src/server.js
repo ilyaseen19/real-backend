@@ -28,6 +28,8 @@ const Property = require("./api/routes/propperty");
 const UpImage = require("./api/routes/uploadImages");
 const Settings = require("./api/routes/settings");
 const Tours = require("./api/routes/tours");
+const Chats = require("./api/routes/chats");
+const Bookings = require("./api/routes/bookings");
 
 // end points
 app.use("/api/admin", Admin);
@@ -39,6 +41,8 @@ app.use("/api/properties", Property);
 app.use("/api/upload", UpImage);
 app.use("/api/settings", Settings);
 app.use("/api/tours", Tours);
+app.use("/api/admin/chats", Chats);
+app.use("/api/bookings", Bookings);
 
 app.get("/", (req, res) => {
   res.send("Hello Welcome to real estate api! written by prince");

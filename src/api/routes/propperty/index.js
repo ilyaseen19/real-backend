@@ -7,6 +7,57 @@ const { normalizeSettings, getCountryConfig, getAllowedCurrencies } = require(".
 
 const router = express.Router();
 
+const normalizeListingMode = (value) => {
+  const mode = String(value || "").trim().toLowerCase();
+
+  if (mode === "sale") return "Sale";
+  if (mode === "rent") return "Rent";
+  if (mode === "short stay" || mode === "short-stay" || mode === "shortstay") {
+    return "Short Stay";
+  }
+
+  return value;
+};
+
+const normalizeDateValue = (value) => {
+  if (!value) return "";
+  const normalized = new Date(value);
+  if (Number.isNaN(normalized.getTime())) return "";
+  return normalized.toISOString().split("T")[0];
+};
+
+const normalizeDateList = (value) => {
+  if (!value) return [];
+
+  const values = Array.isArray(value)
+    ? value
+    : String(value)
+        .split(/[\n,]+/)
+        .map((item) => item.trim());
+
+  return [...new Set(values.map(normalizeDateValue).filter(Boolean))].sort();
+};
+
+const buildDateRange = (start, end) => {
+  const startDate = normalizeDateValue(start);
+  const endDate = normalizeDateValue(end);
+
+  if (!startDate || !endDate || startDate > endDate) {
+    return [];
+  }
+
+  const dates = [];
+  const current = new Date(startDate);
+  const last = new Date(endDate);
+
+  while (current <= last) {
+    dates.push(current.toISOString().split("T")[0]);
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
+};
+
 router.get("/getProperties", async (req, res) => {
   try {
     const data = await Property.find();
@@ -88,17 +139,55 @@ router.get("/findMany/", async (req, res) => {
 router.patch("/update/:ID", async (req, res) => {
   try {
     const _id = req.params.ID;
-    const { isApproved } = req.body;
-    const updated = await Property.updateOne(
-      {
-        _id,
-      },
-      {
-        $set: {
-          isApproved,
-        },
-      }
-    );
+    const property = await Property.findById(_id);
+
+    if (!property) {
+      return res.status(404).json({
+        success: 0,
+        message: "Property not found",
+      });
+    }
+
+    const updateFields = {};
+    if (typeof req.body.isApproved === "boolean") {
+      updateFields.isApproved = req.body.isApproved;
+    }
+
+    if (req.body.shortStay) {
+      const currentShortStay = property.shortStay || {};
+      const nextShortStay = {
+        enabled:
+          req.body.shortStay.enabled !== undefined
+            ? !!req.body.shortStay.enabled
+            : !!currentShortStay.enabled,
+        minimumNights:
+          req.body.shortStay.minimumNights !== undefined
+            ? Number(req.body.shortStay.minimumNights) || 1
+            : currentShortStay.minimumNights || 1,
+        checkInTime:
+          req.body.shortStay.checkInTime || currentShortStay.checkInTime || "14:00",
+        checkOutTime:
+          req.body.shortStay.checkOutTime || currentShortStay.checkOutTime || "11:00",
+        openDates:
+          req.body.shortStay.openDates !== undefined
+            ? normalizeDateList(req.body.shortStay.openDates)
+            : normalizeDateList(currentShortStay.openDates),
+        blockedDates:
+          req.body.shortStay.blockedDates !== undefined
+            ? normalizeDateList(req.body.shortStay.blockedDates)
+            : normalizeDateList(currentShortStay.blockedDates),
+        bookedDates:
+          req.body.shortStay.bookedDates !== undefined
+            ? normalizeDateList(req.body.shortStay.bookedDates)
+            : normalizeDateList(currentShortStay.bookedDates),
+      };
+
+      updateFields.shortStay = nextShortStay;
+      updateFields.rentOrSale =
+        normalizeListingMode(req.body.rentOrSale || property.rentOrSale) || property.rentOrSale;
+    }
+
+    const updated = await Property.updateOne({ _id }, { $set: updateFields });
 
     if (updated.modifiedCount > 0)
       return res.status(201).json({
@@ -264,6 +353,12 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       city,
       suburb,
       currency,
+      shortStayMinimumNights,
+      shortStayCheckInTime,
+      shortStayCheckOutTime,
+      shortStayAvailabilityStart,
+      shortStayAvailabilityEnd,
+      shortStayBlockedDates,
     } = data;
 
     const settingsDoc = await Settings.findOne();
@@ -306,6 +401,21 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       });
     }
 
+    const normalizedRentOrSale = normalizeListingMode(rentOrSale);
+    const isShortStay = normalizedRentOrSale === "Short Stay";
+    const shortStayOpenDates = buildDateRange(
+      shortStayAvailabilityStart,
+      shortStayAvailabilityEnd
+    );
+    const shortStayBlockedDateList = normalizeDateList(shortStayBlockedDates);
+
+    if (isShortStay && shortStayOpenDates.length === 0) {
+      return res.status(400).json({
+        success: 0,
+        message: "Short stay listings need an available date range",
+      });
+    }
+
     const others = {
       diningRoom: dRoom,
       kitchen,
@@ -333,7 +443,7 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       name: propName,
       location: propLoca,
       propType,
-      rentOrSale,
+      rentOrSale: normalizedRentOrSale,
       price,
       currency: resolvedCurrency,
       currencySymbol:
@@ -351,6 +461,15 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       province: province || "",
       city: city || "",
       suburb: suburb || "",
+      shortStay: {
+        enabled: isShortStay,
+        minimumNights: isShortStay ? Number(shortStayMinimumNights) || 1 : 1,
+        checkInTime: isShortStay ? shortStayCheckInTime || "14:00" : "14:00",
+        checkOutTime: isShortStay ? shortStayCheckOutTime || "11:00" : "11:00",
+        openDates: isShortStay ? shortStayOpenDates : [],
+        blockedDates: isShortStay ? shortStayBlockedDateList : [],
+        bookedDates: [],
+      },
       others,
       isApproved: false,
       amenities,

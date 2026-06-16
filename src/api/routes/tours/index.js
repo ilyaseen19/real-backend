@@ -11,7 +11,7 @@ router.post("/book", async (req, res) => {
     const { userName, email, phone, tourDate, tourTime, note, propertyId, agentid } = req.body;
 
     // Validate required fields
-    if (!userName || !email || !phone || !tourDate || !tourTime || !note || !propertyId || !agentid) {
+    if (!userName || !email || !phone || !tourDate || !tourTime || !propertyId || !agentid) {
       return res.status(400).json({
         success: 0,
         message: "All fields are required",
@@ -42,7 +42,7 @@ router.post("/book", async (req, res) => {
       phone,
       tourDate,
       tourTime,
-      note,
+      note: note || "",
       propertyId,
       agentid,
     });
