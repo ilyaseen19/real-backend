@@ -13,6 +13,7 @@ const defaultSettings = {
       {
         id: "ghana",
         name: "Ghana",
+        enabled: true,
         isoCode: "GH",
         phoneCode: "+233",
         defaultCurrency: "GHS",
@@ -52,6 +53,7 @@ const defaultSettings = {
       {
         id: "zambia",
         name: "Zambia",
+        enabled: true,
         isoCode: "ZM",
         phoneCode: "+260",
         defaultCurrency: "ZMW",
@@ -154,6 +156,7 @@ const normalizeProvince = (province) => ({
 const normalizeCountry = (country, generalDefaults) => ({
   id: country?.id || (country?.name || "country").toLowerCase().replace(/\s+/g, "-"),
   name: country?.name || "",
+  enabled: country?.enabled !== false,
   isoCode: country?.isoCode || "",
   phoneCode: country?.phoneCode || "",
   defaultCurrency: country?.defaultCurrency || generalDefaults.defaultCurrency,
