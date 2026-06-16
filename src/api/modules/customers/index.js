@@ -63,6 +63,21 @@ const customerSchema = new mongoose.Schema(
       unique: false,
       trim: true,
     },
+    country: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    countryCode: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    preferredCurrency: {
+      type: String,
+      required: false,
+      trim: true,
+    },
     isBlocked: {
       type: Boolean,
       required: true,

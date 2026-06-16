@@ -2,6 +2,8 @@ const express = require("express");
 const { _encrypt, _decrypt } = require("../../libs/encrypt");
 const { upload } = require("../../middlewares/imageUpload");
 const Customer = require("../../modules/customers");
+const Settings = require("../../modules/settings");
+const { normalizeSettings, getCountryConfig, getAllowedCurrencies } = require("../../libs/siteSettings");
 
 const router = express.Router();
 
@@ -195,7 +197,18 @@ router.delete("/remove/:ID", async (req, res) => {
 
 router.post("/create", async (req, res) => {
   try {
-    const { firstName, lastName, phone, email, password, role } = req.body;
+    const { firstName, lastName, phone, email, password, role, country } = req.body;
+    const settingsDoc = await Settings.findOne();
+    const settings = normalizeSettings(settingsDoc ? settingsDoc.toObject() : {});
+    const selectedCountry = getCountryConfig(settings, country);
+
+    if (!selectedCountry) {
+      return res.status(400).json({
+        success: 0,
+        message: "Select a valid country configured in settings",
+      });
+    }
+
     const emailExist = await Customer.findOne({ email });
 
     if (emailExist)
@@ -212,6 +225,9 @@ router.post("/create", async (req, res) => {
       email,
       password: encryptedPass,
       role,
+      country: selectedCountry.name,
+      countryCode: selectedCountry.phoneCode,
+      preferredCurrency: getAllowedCurrencies(selectedCountry, settings)[0],
       isBlocked: false,
     });
     const savedUser = await user.save();

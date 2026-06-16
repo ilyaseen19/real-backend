@@ -50,6 +50,11 @@ const adminSchema = new mongoose.Schema(
       unique: false,
       trim: true,
     },
+    authorizations: {
+      type: [String],
+      required: false,
+      default: [],
+    },
   },
   { timestamps: true }
 );

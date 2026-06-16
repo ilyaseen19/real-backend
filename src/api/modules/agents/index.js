@@ -62,10 +62,35 @@ const agentSchema = new mongoose.Schema(
       unique: false,
       trim: true,
     },
-    ghanaCard: {
+    country: {
       type: String,
       required: true,
-      unique: true,
+      trim: true,
+    },
+    countryCode: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    preferredCurrency: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    allowedCurrencies: {
+      type: [String],
+      required: false,
+      default: [],
+    },
+    identityNumber: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    ghanaCard: {
+      type: String,
+      required: false,
+      unique: false,
       trim: true,
     },
     gr1: {

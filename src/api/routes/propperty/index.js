@@ -2,6 +2,8 @@ const express = require("express");
 const Property = require("../../modules/properties");
 const Agent = require("../../modules/agents");
 const { upload } = require("../../middlewares/imageUpload");
+const Settings = require("../../modules/settings");
+const { normalizeSettings, getCountryConfig, getAllowedCurrencies } = require("../../libs/siteSettings");
 
 const router = express.Router();
 
@@ -260,8 +262,49 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       country,
       province,
       city,
-      suburb
+      suburb,
+      currency,
     } = data;
+
+    const settingsDoc = await Settings.findOne();
+    const settings = normalizeSettings(settingsDoc ? settingsDoc.toObject() : {});
+    const selectedCountry = getCountryConfig(settings, country);
+
+    if (!selectedCountry) {
+      return res.status(400).json({
+        success: 0,
+        message: "Select a valid country configured in settings",
+      });
+    }
+
+    const assignedAgent = await Agent.findById(agentID);
+
+    if (!assignedAgent) {
+      return res.status(404).json({
+        success: 0,
+        message: "Assigned agent not found",
+      });
+    }
+
+    if (
+      assignedAgent.country &&
+      assignedAgent.country.toLowerCase() !== selectedCountry.name.toLowerCase()
+    ) {
+      return res.status(400).json({
+        success: 0,
+        message: "The property country must match the assigned agent country",
+      });
+    }
+
+    const allowedCurrencies = getAllowedCurrencies(selectedCountry, settings);
+    const resolvedCurrency = currency || selectedCountry.defaultCurrency;
+
+    if (!allowedCurrencies.includes(resolvedCurrency)) {
+      return res.status(400).json({
+        success: 0,
+        message: `Allowed currencies for ${selectedCountry.name} are ${allowedCurrencies.join(", ")}`,
+      });
+    }
 
     const others = {
       diningRoom: dRoom,
@@ -292,6 +335,11 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       propType,
       rentOrSale,
       price,
+      currency: resolvedCurrency,
+      currencySymbol:
+        resolvedCurrency === settings.general.defaultCurrency
+          ? settings.general.defaultCurrencySymbol
+          : resolvedCurrency,
       numberOfRooms: rooms,
       squareFt: sqft,
       propDescription: propDesc,
@@ -312,9 +360,8 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
     const savedProp = await property.save();
 
     if (savedProp) {
-      const agent = await Agent.findById({ _id: savedProp.agentID });
       var propt = { propertyID: savedProp._id };
-      const newProps = [...agent.properties, propt];
+      const newProps = [...(assignedAgent.properties || []), propt];
       const saveId = await Agent.updateOne(
         { _id: agentID },
         {

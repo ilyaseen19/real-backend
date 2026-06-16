@@ -3,6 +3,8 @@ const { _encrypt, _decrypt } = require("../../libs/encrypt");
 const { _generateQr } = require("../../libs/qr");
 const { upload } = require("../../middlewares/imageUpload");
 const Agent = require("../../modules/agents");
+const Settings = require("../../modules/settings");
+const { normalizeSettings, getCountryConfig, getAllowedCurrencies } = require("../../libs/siteSettings");
 
 const router = express.Router();
 
@@ -272,7 +274,9 @@ router.post("/create", upload.single("profileImg"), async (req, res) => {
       password,
       role,
       address,
+      country,
       dob,
+      identityNumber,
       ghanaCard,
       gr1,
       gr1Contact,
@@ -284,7 +288,28 @@ router.post("/create", upload.single("profileImg"), async (req, res) => {
       twAct,
       insAct,
     } = data;
+    const settingsDoc = await Settings.findOne();
+    const settings = normalizeSettings(settingsDoc ? settingsDoc.toObject() : {});
+    const selectedCountry = getCountryConfig(settings, country);
+
+    if (!selectedCountry) {
+      return res.status(400).json({
+        success: 0,
+        message: "Select a valid country configured in settings",
+      });
+    }
+
+    const resolvedIdentityNumber = identityNumber || ghanaCard;
+
+    if (!resolvedIdentityNumber) {
+      return res.status(400).json({
+        success: 0,
+        message: "Identity number is required",
+      });
+    }
+
     const emailExist = await Agent.findOne({ email });
+    const identityExist = await Agent.findOne({ identityNumber: resolvedIdentityNumber });
 
     if (emailExist)
       return res.status(400).json({
@@ -298,10 +323,10 @@ router.post("/create", upload.single("profileImg"), async (req, res) => {
         message: "User with this phone number already exist",
       });
 
-    if (emailExist && emailExist.ghanaCard === ghanaCard)
+    if (identityExist)
       return res.status(400).json({
         success: 0,
-        message: "User with this ghana card ID already exist",
+        message: "User with this identity number already exist",
       });
 
     const qr = await _generateQr({
@@ -322,8 +347,13 @@ router.post("/create", upload.single("profileImg"), async (req, res) => {
       address,
       role,
       image: profileImg,
+      country: selectedCountry.name,
+      countryCode: selectedCountry.phoneCode,
+      preferredCurrency: selectedCountry.defaultCurrency,
+      allowedCurrencies: getAllowedCurrencies(selectedCountry, settings),
       dob,
-      ghanaCard,
+      identityNumber: resolvedIdentityNumber,
+      ghanaCard: resolvedIdentityNumber,
       gr1,
       gr1Contact,
       gr1Relation,

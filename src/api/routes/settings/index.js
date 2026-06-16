@@ -1,37 +1,32 @@
 const express = require("express");
 const Settings = require("../../modules/settings");
+const { defaultSettings, mergeLegacySettings, normalizeSettings } = require("../../libs/siteSettings");
 
 const router = express.Router();
 
 router.get("/getSettings", async (req, res) => {
   try {
-    const settings = await Settings.findOne();
-    if (settings) {
-      return res.status(200).json({
-        success: 1,
-        data: settings,
-      });
+    let settings = await Settings.findOne();
+
+    if (!settings) {
+      settings = await new Settings(defaultSettings).save();
+    } else {
+      const normalized = mergeLegacySettings(settings.toObject());
+      settings = await Settings.findOneAndUpdate(
+        { _id: settings._id },
+        {
+          $set: {
+            ...normalized,
+            updatedAt: new Date(),
+          },
+        },
+        { new: true }
+      );
     }
 
-    // If no settings exist, create default settings
-    const defaultSettings = new Settings({
-      siteName: "Real Estate",
-      siteDescription: "Real Estate Management System",
-      contactEmail: "contact@realestate.com",
-      contactPhone: "+1234567890",
-      address: "123 Real Estate Street",
-      socialLinks: {
-        facebook: "https://facebook.com/realestate",
-        twitter: "https://twitter.com/realestate",
-        instagram: "https://instagram.com/realestate",
-        linkedin: "https://linkedin.com/company/realestate"
-      }
-    });
-
-    const savedSettings = await defaultSettings.save();
     return res.status(200).json({
       success: 1,
-      data: savedSettings,
+      data: settings,
     });
   } catch (error) {
     console.log(error);
@@ -44,19 +39,19 @@ router.get("/getSettings", async (req, res) => {
 
 router.patch("/update", async (req, res) => {
   try {
-    const settings = await Settings.findOne();
+    let settings = await Settings.findOne();
+
     if (!settings) {
-      return res.status(404).json({
-        success: 0,
-        message: "Settings not found",
-      });
+      settings = await new Settings(defaultSettings).save();
     }
 
+    const normalizedSettings = normalizeSettings(req.body || {});
+
     const updatedSettings = await Settings.findOneAndUpdate(
-      {},
+      { _id: settings._id },
       { 
         $set: { 
-          ...req.body,
+          ...normalizedSettings,
           updatedAt: new Date()
         } 
       },

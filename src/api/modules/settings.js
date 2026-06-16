@@ -1,32 +1,26 @@
 const mongoose = require("mongoose");
+const { defaultSettings } = require("../libs/siteSettings");
 
 const settingsSchema = new mongoose.Schema({
-  siteName: {
-    type: String,
-    required: true,
-    default: "Real Estate"
+  general: {
+    type: mongoose.Schema.Types.Mixed,
+    default: () => defaultSettings.general,
   },
-  siteDescription: {
-    type: String,
-    default: "Real Estate Management System"
+  location: {
+    type: mongoose.Schema.Types.Mixed,
+    default: () => defaultSettings.location,
   },
-  contactEmail: {
-    type: String,
-    required: true
+  property: {
+    type: mongoose.Schema.Types.Mixed,
+    default: () => defaultSettings.property,
   },
-  contactPhone: {
-    type: String,
-    required: true
+  content: {
+    type: mongoose.Schema.Types.Mixed,
+    default: () => defaultSettings.content,
   },
-  address: {
-    type: String,
-    required: true
-  },
-  socialLinks: {
-    facebook: String,
-    twitter: String,
-    instagram: String,
-    linkedin: String
+  developer: {
+    type: mongoose.Schema.Types.Mixed,
+    default: () => defaultSettings.developer,
   },
   updatedAt: {
     type: Date,

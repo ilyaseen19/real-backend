@@ -49,6 +49,16 @@ const propertySchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    currency: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    currencySymbol: {
+      type: String,
+      required: false,
+      trim: true,
+    },
     numberOfRooms: {
       type: Number,
       required: true,
