@@ -95,9 +95,20 @@ const propertySchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    squareFt: {
-      type: Number,
+    areaValue: {
+      type: String,
       required: false,
+      trim: true,
+    },
+    areaUnit: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    squareFt: {
+      type: String,
+      required: false,
+      trim: true,
     },
     propDescription: {
       type: String,
@@ -113,7 +124,7 @@ const propertySchema = new mongoose.Schema(
     },
     yearBuilt: {
       type: String,
-      required: true,
+      required: false,
       unique: false,
       trim: true,
     },
@@ -219,6 +230,10 @@ const propertySchema = new mongoose.Schema(
       image5: {
         type: String,
         required: false,
+      },
+      gallery: {
+        type: [String],
+        default: [],
       },
     },
   },

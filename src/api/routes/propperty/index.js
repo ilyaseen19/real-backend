@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const Property = require("../../modules/properties");
 const Agent = require("../../modules/agents");
 const { upload } = require("../../middlewares/imageUpload");
@@ -298,24 +299,31 @@ router.delete("/sell/:ID", async (req, res) => {
 
 router.post("/create", upload.array("propImage"), async (req, res) => {
   try {
+    const url = req.protocol + "://" + req.get("host");
+    const galleryImages = Array.isArray(req.files)
+      ? req.files.map((file) => url + "/public/" + file.filename)
+      : [];
     var images = {
       image1: "",
       image2: "",
       image3: "",
       image4: "",
       image5: "",
+      gallery: galleryImages,
     };
-    const url = req.protocol + "://" + req.get("host");
-    
+
     // Improved error handling for image files
-    if (req.files && req.files.length > 0) {
-      images.image1 = req.files[0] ? url + "/public/" + req.files[0].filename : "";
-      images.image2 = req.files[1] ? url + "/public/" + req.files[1].filename : "";
-      images.image3 = req.files[2] ? url + "/public/" + req.files[2].filename : "";
-      images.image4 = req.files[3] ? url + "/public/" + req.files[3].filename : "";
-      images.image5 = req.files[4] ? url + "/public/" + req.files[4].filename : "";
+    if (galleryImages.length > 0) {
+      images.image1 = galleryImages[0] || "";
+      images.image2 = galleryImages[1] || "";
+      images.image3 = galleryImages[2] || "";
+      images.image4 = galleryImages[3] || "";
+      images.image5 = galleryImages[4] || "";
     } else {
-      console.log("No image files uploaded");
+      return res.status(400).json({
+        success: 0,
+        message: "Please upload at least one image",
+      });
     }
 
     const data = await JSON.parse(req.body.data);
@@ -327,6 +335,8 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       price,
       rooms,
       sqft,
+      areaValue,
+      areaUnit,
       propDesc,
       address,
       year,
@@ -372,7 +382,23 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       });
     }
 
-    const assignedAgent = await Agent.findById(agentID);
+    const normalizedAgentID = String(agentID || "").trim();
+
+    if (!normalizedAgentID) {
+      return res.status(400).json({
+        success: 0,
+        message: "Property must be attached to an agent account",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(normalizedAgentID)) {
+      return res.status(400).json({
+        success: 0,
+        message: "Invalid agent account selected for this property",
+      });
+    }
+
+    const assignedAgent = await Agent.findById(normalizedAgentID);
 
     if (!assignedAgent) {
       return res.status(404).json({
@@ -439,6 +465,12 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       petsAllowed: pets === undefined ? false : pets,
     };
 
+    const normalizedAreaValue = String(areaValue || sqft || "").trim();
+    const normalizedAreaUnit = String(areaUnit || "").trim();
+    const formattedArea = normalizedAreaValue
+      ? `${normalizedAreaValue}${normalizedAreaUnit ? ` ${normalizedAreaUnit}` : ""}`.trim()
+      : "";
+
     const property = new Property({
       name: propName,
       location: propLoca,
@@ -451,11 +483,13 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
           ? settings.general.defaultCurrencySymbol
           : resolvedCurrency,
       numberOfRooms: rooms,
-      squareFt: sqft,
+      areaValue: normalizedAreaValue,
+      areaUnit: normalizedAreaUnit,
+      squareFt: formattedArea,
       propDescription: propDesc,
       digitalAddress: address,
-      yearBuilt: year,
-      agentID,
+      yearBuilt: year || "",
+      agentID: normalizedAgentID,
       // Add new location fields
       country: country || "",
       province: province || "",
@@ -482,7 +516,7 @@ router.post("/create", upload.array("propImage"), async (req, res) => {
       var propt = { propertyID: savedProp._id };
       const newProps = [...(assignedAgent.properties || []), propt];
       const saveId = await Agent.updateOne(
-        { _id: agentID },
+        { _id: normalizedAgentID },
         {
           $set: {
             properties: newProps,
