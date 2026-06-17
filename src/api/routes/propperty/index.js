@@ -137,7 +137,7 @@ router.get("/findMany/", async (req, res) => {
   }
 });
 
-router.patch("/update/:ID", async (req, res) => {
+router.patch("/update/:ID", upload.array("propImage"), async (req, res) => {
   try {
     const _id = req.params.ID;
     const property = await Property.findById(_id);
@@ -149,44 +149,234 @@ router.patch("/update/:ID", async (req, res) => {
       });
     }
 
-    const updateFields = {};
-    if (typeof req.body.isApproved === "boolean") {
-      updateFields.isApproved = req.body.isApproved;
+    const payload = req.body?.data ? JSON.parse(req.body.data) : req.body;
+    const {
+      propName,
+      propLoca,
+      propType,
+      rentOrSale,
+      price,
+      rooms,
+      sqft,
+      areaValue,
+      areaUnit,
+      propDesc,
+      address,
+      year,
+      agentID,
+      dRoom,
+      kitchen,
+      bedRoomNumber,
+      bathRoomNumber,
+      livRoom,
+      mBedroom,
+      porch,
+      carPark,
+      stRoom,
+      pool,
+      ppWater,
+      acon,
+      elct,
+      nmRoad,
+      nsMarket,
+      pets,
+      country,
+      province,
+      city,
+      suburb,
+      currency,
+      existingImages,
+      shortStayMinimumNights,
+      shortStayCheckInTime,
+      shortStayCheckOutTime,
+      shortStayAvailabilityStart,
+      shortStayAvailabilityEnd,
+      shortStayBlockedDates,
+      shortStay,
+      isApproved,
+    } = payload || {};
+
+    const settingsDoc = await Settings.findOne();
+    const settings = normalizeSettings(settingsDoc ? settingsDoc.toObject() : {});
+    const resolvedCountryName = country || property.country || "";
+    const selectedCountry = getCountryConfig(settings, resolvedCountryName);
+
+    if (!selectedCountry) {
+      return res.status(400).json({
+        success: 0,
+        message: "Select a valid country configured in settings",
+      });
     }
 
-    if (req.body.shortStay) {
-      const currentShortStay = property.shortStay || {};
-      const nextShortStay = {
-        enabled:
-          req.body.shortStay.enabled !== undefined
-            ? !!req.body.shortStay.enabled
-            : !!currentShortStay.enabled,
-        minimumNights:
-          req.body.shortStay.minimumNights !== undefined
-            ? Number(req.body.shortStay.minimumNights) || 1
-            : currentShortStay.minimumNights || 1,
-        checkInTime:
-          req.body.shortStay.checkInTime || currentShortStay.checkInTime || "14:00",
-        checkOutTime:
-          req.body.shortStay.checkOutTime || currentShortStay.checkOutTime || "11:00",
-        openDates:
-          req.body.shortStay.openDates !== undefined
-            ? normalizeDateList(req.body.shortStay.openDates)
-            : normalizeDateList(currentShortStay.openDates),
-        blockedDates:
-          req.body.shortStay.blockedDates !== undefined
-            ? normalizeDateList(req.body.shortStay.blockedDates)
-            : normalizeDateList(currentShortStay.blockedDates),
-        bookedDates:
-          req.body.shortStay.bookedDates !== undefined
-            ? normalizeDateList(req.body.shortStay.bookedDates)
-            : normalizeDateList(currentShortStay.bookedDates),
-      };
+    const normalizedAgentID = String(agentID || property.agentID || "").trim();
 
-      updateFields.shortStay = nextShortStay;
-      updateFields.rentOrSale =
-        normalizeListingMode(req.body.rentOrSale || property.rentOrSale) || property.rentOrSale;
+    if (!normalizedAgentID || !mongoose.Types.ObjectId.isValid(normalizedAgentID)) {
+      return res.status(400).json({
+        success: 0,
+        message: "Property must be attached to a valid agent account",
+      });
     }
+
+    const assignedAgent = await Agent.findById(normalizedAgentID);
+
+    if (!assignedAgent) {
+      return res.status(404).json({
+        success: 0,
+        message: "Assigned agent not found",
+      });
+    }
+
+    if (
+      assignedAgent.country &&
+      assignedAgent.country.toLowerCase() !== selectedCountry.name.toLowerCase()
+    ) {
+      return res.status(400).json({
+        success: 0,
+        message: "The property country must match the assigned agent country",
+      });
+    }
+
+    const allowedCurrencies = getAllowedCurrencies(selectedCountry, settings);
+    const resolvedCurrency = currency || property.currency || selectedCountry.defaultCurrency;
+
+    if (!allowedCurrencies.includes(resolvedCurrency)) {
+      return res.status(400).json({
+        success: 0,
+        message: `Allowed currencies for ${selectedCountry.name} are ${allowedCurrencies.join(", ")}`,
+      });
+    }
+
+    const url = req.protocol + "://" + req.get("host");
+    const uploadedGallery = Array.isArray(req.files)
+      ? req.files.map((file) => url + "/public/" + file.filename)
+      : [];
+    const currentImages = [
+      property.images?.image1,
+      property.images?.image2,
+      property.images?.image3,
+      property.images?.image4,
+      property.images?.image5,
+      ...(Array.isArray(property.images?.gallery) ? property.images.gallery : []),
+    ].filter(Boolean);
+    const nextGallery =
+      uploadedGallery.length > 0
+        ? uploadedGallery
+        : Array.isArray(existingImages) && existingImages.length > 0
+          ? existingImages.filter(Boolean)
+          : currentImages;
+
+    if (nextGallery.length === 0) {
+      return res.status(400).json({
+        success: 0,
+        message: "Please upload at least one image",
+      });
+    }
+
+    const normalizedRentOrSale = normalizeListingMode(rentOrSale || property.rentOrSale);
+    const isShortStayListing = normalizedRentOrSale === "Short Stay";
+    const shortStayOpenDates = shortStay?.openDates
+      ? normalizeDateList(shortStay.openDates)
+      : buildDateRange(
+          shortStayAvailabilityStart || property.shortStay?.openDates?.[0],
+          shortStayAvailabilityEnd ||
+            property.shortStay?.openDates?.[property.shortStay?.openDates?.length - 1]
+        );
+    const shortStayBlockedDateList = shortStay?.blockedDates
+      ? normalizeDateList(shortStay.blockedDates)
+      : normalizeDateList(shortStayBlockedDates || property.shortStay?.blockedDates);
+
+    if (isShortStayListing && shortStayOpenDates.length === 0) {
+      return res.status(400).json({
+        success: 0,
+        message: "Short stay listings need an available date range",
+      });
+    }
+
+    const normalizedAreaValue = String(
+      areaValue || property.areaValue || sqft || property.squareFt || ""
+    ).trim();
+    const normalizedAreaUnit = String(areaUnit || property.areaUnit || "").trim();
+    const formattedArea = normalizedAreaValue
+      ? `${normalizedAreaValue}${normalizedAreaUnit ? ` ${normalizedAreaUnit}` : ""}`.trim()
+      : "";
+
+    const updateFields = {
+      name: propName || property.name,
+      location: propLoca || property.location,
+      propType: propType || property.propType,
+      rentOrSale: normalizedRentOrSale,
+      price: price !== undefined && price !== "" ? price : property.price,
+      currency: resolvedCurrency,
+      currencySymbol:
+        resolvedCurrency === settings.general.defaultCurrency
+          ? settings.general.defaultCurrencySymbol
+          : resolvedCurrency,
+      numberOfRooms: rooms !== undefined && rooms !== "" ? rooms : property.numberOfRooms,
+      areaValue: normalizedAreaValue,
+      areaUnit: normalizedAreaUnit,
+      squareFt: formattedArea,
+      propDescription: propDesc || property.propDescription,
+      digitalAddress: address || property.digitalAddress,
+      yearBuilt: year !== undefined ? year : property.yearBuilt,
+      agentID: normalizedAgentID,
+      country: resolvedCountryName,
+      province: province !== undefined ? province : property.province,
+      city: city !== undefined ? city : property.city,
+      suburb: suburb !== undefined ? suburb : property.suburb,
+      isApproved: typeof isApproved === "boolean" ? isApproved : property.isApproved,
+      others: {
+        diningRoom: dRoom !== undefined ? dRoom : property.others?.diningRoom,
+        kitchen: kitchen !== undefined ? kitchen : property.others?.kitchen,
+        bathrooms:
+          bathRoomNumber !== undefined && bathRoomNumber !== ""
+            ? bathRoomNumber
+            : property.others?.bathrooms,
+        masterBedroom: mBedroom !== undefined ? mBedroom : property.others?.masterBedroom,
+        noOfBedrooms:
+          bedRoomNumber !== undefined && bedRoomNumber !== ""
+            ? bedRoomNumber
+            : property.others?.noOfBedrooms,
+        livingRoom: livRoom !== undefined ? livRoom : property.others?.livingRoom,
+        porch: porch !== undefined ? porch : property.others?.porch,
+        carPark: carPark !== undefined ? carPark : property.others?.carPark,
+        storeRoom: stRoom !== undefined ? stRoom : property.others?.storeRoom,
+        available:
+          property.others?.available === undefined ? true : property.others.available,
+      },
+      amenities: {
+        pipeWater: ppWater !== undefined ? ppWater : property.amenities?.pipeWater,
+        electricity: elct !== undefined ? elct : property.amenities?.electricity,
+        swimmingPool: pool !== undefined ? pool : property.amenities?.swimmingPool,
+        airCondition: acon !== undefined ? acon : property.amenities?.airCondition,
+        nearMainRoad: nmRoad !== undefined ? nmRoad : property.amenities?.nearMainRoad,
+        nearSuperMarket:
+          nsMarket !== undefined ? nsMarket : property.amenities?.nearSuperMarket,
+        petsAllowed: pets !== undefined ? pets : property.amenities?.petsAllowed,
+      },
+      shortStay: {
+        enabled: isShortStayListing,
+        minimumNights: isShortStayListing
+          ? Number(shortStayMinimumNights || shortStay?.minimumNights) || 1
+          : 1,
+        checkInTime: isShortStayListing
+          ? shortStayCheckInTime || shortStay?.checkInTime || property.shortStay?.checkInTime || "14:00"
+          : "14:00",
+        checkOutTime: isShortStayListing
+          ? shortStayCheckOutTime || shortStay?.checkOutTime || property.shortStay?.checkOutTime || "11:00"
+          : "11:00",
+        openDates: isShortStayListing ? shortStayOpenDates : [],
+        blockedDates: isShortStayListing ? shortStayBlockedDateList : [],
+        bookedDates: normalizeDateList(property.shortStay?.bookedDates),
+      },
+      images: {
+        image1: nextGallery[0] || "",
+        image2: nextGallery[1] || "",
+        image3: nextGallery[2] || "",
+        image4: nextGallery[3] || "",
+        image5: nextGallery[4] || "",
+        gallery: nextGallery,
+      },
+    };
 
     const updated = await Property.updateOne({ _id }, { $set: updateFields });
 
